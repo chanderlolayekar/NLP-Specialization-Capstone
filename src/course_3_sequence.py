@@ -1,72 +1,48 @@
+import sys
+import os
+import unittest
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import (
-    Input,
-    Embedding,
-    Bidirectional,
-    LSTM,
-    GRU,
-    TimeDistributed,
-    Dense,
-    Dropout
-)
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from src.course_3_sequence import build_ner_model, SequenceModels
 
 
-def build_ner_model(
-    vocab_size: int,
-    num_tags: int,
-    max_len: int = 50,
-    embedding_dim: int = 64,
-    rnn_units: int = 64,
-    use_gru: bool = False
-) -> tf.keras.Model:
-    """
-    Builds a Bidirectional LSTM or GRU model for Named Entity Recognition (NER).
+class TestCourse3Sequence(unittest.TestCase):
 
-    Parameters:
-        vocab_size: Size of the token vocabulary
-        num_tags: Number of distinct entity tags (e.g., PER, LOC, ORG, O)
-        max_len: Fixed length of padded input sequences
-        embedding_dim: Dimension of dense embedding vectors
-        rnn_units: Number of units in hidden recurrent states
-        use_gru: If True, uses GRU instead of LSTM
-    """
-    model = Sequential()
-    
-    # Input layer matching sequence length
-    model.add(Input(shape=(max_len,)))
-    
-    # Mask zero-padding so padded tokens don't affect gradients
-    model.add(Embedding(input_dim=vocab_size, output_dim=embedding_dim, mask_zero=True))
-    
-    # Recurrent Layer (Bidirectional LSTM or GRU)
-    rnn_layer = GRU(rnn_units, return_sequences=True) if use_gru else LSTM(rnn_units, return_sequences=True)
-    model.add(Bidirectional(rnn_layer))
-    
-    model.add(Dropout(0.3))
-    
-    # TimeDistributed applies Dense classification across all time-steps (tokens)
-    model.add(TimeDistributed(Dense(num_tags, activation="softmax")))
+    def setUp(self):
+        self.vocab_size = 100
+        self.num_tags = 4  # e.g., 0: O, 1: B-PER, 2: B-LOC, 3: B-ORG
+        self.max_len = 10
+        self.num_samples = 8
 
-    model.compile(
-        optimizer="adam",
-        loss="sparse_categorical_crossentropy",
-        metrics=["accuracy"]
-    )
-    
-    return model
+        # Dummy dataset: tokenized sequence batches
+        self.X_dummy = np.random.randint(1, self.vocab_size, size=(self.num_samples, self.max_len))
+        self.y_dummy = np.random.randint(0, self.num_tags, size=(self.num_samples, self.max_len))
+
+    def test_lstm_ner_shape(self):
+        """Verify Bi-LSTM NER model output shape equals (batch_size, sequence_length, num_tags)."""
+        model = build_ner_model(
+            vocab_size=self.vocab_size, 
+            num_tags=self.num_tags, 
+            max_len=self.max_len,
+            use_gru=False
+        )
+        predictions = model.predict(self.X_dummy, verbose=0)
+        self.assertEqual(predictions.shape, (self.num_samples, self.max_len, self.num_tags))
+
+    def test_gru_ner_training(self):
+        """Verify Bi-GRU model can run a single training step without raising errors."""
+        model = build_ner_model(
+            vocab_size=self.vocab_size, 
+            num_tags=self.num_tags, 
+            max_len=self.max_len,
+            use_gru=True
+        )
+        history = SequenceModels.train_ner_step(model, self.X_dummy, self.y_dummy, epochs=1)
+        self.assertIn("loss", history.history)
 
 
-class SequenceModels:
-    """Course 3: High-Level Sequence Models Class."""
-    
-    @staticmethod
-    def train_ner_step(
-        model: tf.keras.Model, 
-        X_train: np.ndarray, 
-        y_train: np.ndarray, 
-        epochs: int = 1
-    ):
-        """Fits the NER model on tokenized integer sequences and label sequences."""
-        return model.fit(X_train, y_train, epochs=epochs, batch_size=32, verbose=0)
+if __name__ == '__main__':
+    unittest.main()
