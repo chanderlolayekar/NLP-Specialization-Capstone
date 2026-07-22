@@ -7,12 +7,14 @@ def softmax(x: np.ndarray, axis: int = -1) -> np.ndarray:
     return e_x / np.sum(e_x, axis=axis, keepdims=True)
 
 
+from typing import Optional, Tuple
+
 def scaled_dot_product_attention(
     Q: np.ndarray, 
     K: np.ndarray, 
     V: np.ndarray, 
-    mask: np.ndarray | None = None
-) -> tuple[np.ndarray, np.ndarray]:
+    mask: Optional[np.ndarray] = None
+) -> Tuple[np.ndarray, np.ndarray]:
     """
     Computes Scaled Dot-Product Attention using NumPy math.
     
