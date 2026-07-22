@@ -6,9 +6,6 @@ import tensorflow as tf
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from src.course_3_sequence import build_ner_model, SequenceModels
-
-
 class TestCourse3Sequence(unittest.TestCase):
 
     def setUp(self):
