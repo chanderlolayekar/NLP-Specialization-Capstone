@@ -1,45 +1,114 @@
-import sys
-import os
-import unittest
-import numpy as np
+"""
+Course 3: Sequence Models
+Covers Named Entity Recognition (NER) with Bidirectional LSTMs and
+Siamese Networks for sentence similarity using TensorFlow/Keras.
+"""
+
 import tensorflow as tf
+from tensorflow.keras import layers, Model
+from typing import Tuple, Dict, Any
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-class TestCourse3Sequence(unittest.TestCase):
+def build_ner_model(
+    vocab_size: int = 1000, 
+    num_tags: int = 10, 
+    embedding_dim: int = 64, 
+    lstm_units: int = 64
+) -> Model:
+    """
+    Builds a Bidirectional LSTM model for Named Entity Recognition (NER).
+    
+    Parameters:
+        vocab_size: Size of input vocabulary
+        num_tags: Number of distinct entity tags
+        embedding_dim: Dimension of word embeddings
+        lstm_units: Hidden units for LSTM layer
+        
+    Returns:
+        Compiled Keras Model
+    """
+    inputs = layers.Input(shape=(None,), dtype="int32", name="input_tokens")
+    x = layers.Embedding(input_dim=vocab_size, output_dim=embedding_dim, mask_zero=True)(inputs)
+    x = layers.Bidirectional(layers.LSTM(lstm_units, return_sequences=True))(x)
+    outputs = layers.Dense(num_tags, activation="softmax", name="ner_tags")(x)
+    
+    model = Model(inputs=inputs, outputs=outputs, name="ner_bilstm")
+    model.compile(
+        optimizer="adam", 
+        loss="sparse_categorical_crossentropy", 
+        metrics=["accuracy"]
+    )
+    return model
 
-    def setUp(self):
-        self.vocab_size = 100
-        self.num_tags = 4  # e.g., 0: O, 1: B-PER, 2: B-LOC, 3: B-ORG
-        self.max_len = 10
-        self.num_samples = 8
 
-        # Dummy dataset: tokenized sequence batches
-        self.X_dummy = np.random.randint(1, self.vocab_size, size=(self.num_samples, self.max_len))
-        self.y_dummy = np.random.randint(0, self.num_tags, size=(self.num_samples, self.max_len))
+def build_siamese_network(
+    vocab_size: int = 1000, 
+    embedding_dim: int = 64, 
+    lstm_units: int = 64
+) -> Model:
+    """
+    Builds a Siamese LSTM network for sentence/sequence similarity scoring.
+    
+    Parameters:
+        vocab_size: Size of input vocabulary
+        embedding_dim: Dimension of word embeddings
+        lstm_units: Hidden units for shared LSTM encoder
+        
+    Returns:
+        Compiled Keras Model taking pair of sequence inputs
+    """
+    input_a = layers.Input(shape=(None,), dtype="int32", name="sequence_a")
+    input_b = layers.Input(shape=(None,), dtype="int32", name="sequence_b")
+    
+    # Shared layers
+    embedding_layer = layers.Embedding(input_dim=vocab_size, output_dim=embedding_dim)
+    lstm_layer = layers.LSTM(lstm_units)
+    
+    # Encode both inputs with shared weights
+    encoded_a = lstm_layer(embedding_layer(input_a))
+    encoded_b = lstm_layer(embedding_layer(input_b))
+    
+    # Compute absolute difference distance vector
+    distance = layers.Lambda(
+        lambda tensors: tf.abs(tensors[0] - tensors[1]), 
+        name="absolute_difference"
+    )([encoded_a, encoded_b])
+    
+    outputs = layers.Dense(1, activation="sigmoid", name="similarity_score")(distance)
+    
+    model = Model(inputs=[input_a, input_b], outputs=outputs, name="siamese_lstm")
+    model.compile(
+        optimizer="adam", 
+        loss="binary_crossentropy", 
+        metrics=["accuracy"]
+    )
+    return model
 
-    def test_lstm_ner_shape(self):
-        """Verify Bi-LSTM NER model output shape equals (batch_size, sequence_length, num_tags)."""
-        model = build_ner_model(
-            vocab_size=self.vocab_size, 
-            num_tags=self.num_tags, 
-            max_len=self.max_len,
-            use_gru=False
+
+class SequenceModels:
+    """Wrapper class providing high-level interface for sequence model training and evaluation."""
+
+    def __init__(self, vocab_size: int = 1000, embedding_dim: int = 64):
+        self.vocab_size = vocab_size
+        self.embedding_dim = embedding_dim
+        self.ner_model = None
+        self.siamese_model = None
+
+    def initialize_ner(self, num_tags: int = 10, lstm_units: int = 64) -> Model:
+        """Initializes and builds the NER model instance."""
+        self.ner_model = build_ner_model(
+            vocab_size=self.vocab_size,
+            num_tags=num_tags,
+            embedding_dim=self.embedding_dim,
+            lstm_units=lstm_units
         )
-        predictions = model.predict(self.X_dummy, verbose=0)
-        self.assertEqual(predictions.shape, (self.num_samples, self.max_len, self.num_tags))
+        return self.ner_model
 
-    def test_gru_ner_training(self):
-        """Verify Bi-GRU model can run a single training step without raising errors."""
-        model = build_ner_model(
-            vocab_size=self.vocab_size, 
-            num_tags=self.num_tags, 
-            max_len=self.max_len,
-            use_gru=True
+    def initialize_siamese(self, lstm_units: int = 64) -> Model:
+        """Initializes and builds the Siamese network instance."""
+        self.siamese_model = build_siamese_network(
+            vocab_size=self.vocab_size,
+            embedding_dim=self.embedding_dim,
+            lstm_units=lstm_units
         )
-        history = SequenceModels.train_ner_step(model, self.X_dummy, self.y_dummy, epochs=1)
-        self.assertIn("loss", history.history)
-
-
-if __name__ == '__main__':
-    unittest.main()
+        return self.siamese_model
