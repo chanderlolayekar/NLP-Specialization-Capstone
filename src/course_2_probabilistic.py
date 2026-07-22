@@ -1,6 +1,12 @@
 import numpy as np
 
-def min_edit_distance(source: str, target: str, ins_cost: int = 1, del_cost: int = 1, rep_cost: int = 1) -> int:
+def min_edit_distance(
+    source: str, 
+    target: str, 
+    ins_cost: int = 1, 
+    del_cost: int = 1, 
+    rep_cost: int = 1
+) -> int:
     """Computes minimum edit distance between two strings using dynamic programming."""
     m, n = len(source), len(target)
     D = np.zeros((m + 1, n + 1), dtype=int)
@@ -18,7 +24,7 @@ def min_edit_distance(source: str, target: str, ins_cost: int = 1, del_cost: int
                 D[i][j] = min(
                     D[i - 1][j] + del_cost,        # Deletion
                     D[i][j - 1] + ins_cost,        # Insertion
-                    D[i - 1][j - 1] + rep_cost     # Substitution
+                    D[i - 1][j - 1] + rep_cost     # Substitution (cost 1)
                 )
 
     return int(D[m][n])
