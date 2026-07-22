@@ -1,30 +1,25 @@
 import numpy as np
 
-
-def min_edit_distance(source: str, target: str, ins_cost: int = 1, del_cost: int = 1, rep_cost: int = 2) -> int:
-    """
-    Computes the Minimum Edit Distance between source and target strings 
-    using Dynamic Programming (Levenshtein Distance variant).
-    """
+def min_edit_distance(source: str, target: str, ins_cost: int = 1, del_cost: int = 1, rep_cost: int = 1) -> int:
+    """Computes minimum edit distance between two strings using dynamic programming."""
     m, n = len(source), len(target)
-    # Initialize DP table (m+1 x n+1) with zeros
     D = np.zeros((m + 1, n + 1), dtype=int)
 
-    # Base cases: empty source or empty target
-    for i in range(1, m + 1):
-        D[i][0] = D[i - 1][0] + del_cost
-    for j in range(1, n + 1):
-        D[0][j] = D[0][j - 1] + ins_cost
+    for i in range(m + 1):
+        D[i][0] = i * del_cost
+    for j in range(n + 1):
+        D[0][j] = j * ins_cost
 
-    # Fill DP table row by row
     for i in range(1, m + 1):
         for j in range(1, n + 1):
-            cost_del = D[i - 1][j] + del_cost
-            cost_ins = D[i][j - 1] + ins_cost
-            # If characters match, replace cost is 0; otherwise rep_cost
-            cost_rep = D[i - 1][j - 1] + (0 if source[i - 1] == target[j - 1] else rep_cost)
-            
-            D[i][j] = min(cost_del, cost_ins, cost_rep)
+            if source[i - 1] == target[j - 1]:
+                D[i][j] = D[i - 1][j - 1]
+            else:
+                D[i][j] = min(
+                    D[i - 1][j] + del_cost,        # Deletion
+                    D[i][j - 1] + ins_cost,        # Insertion
+                    D[i - 1][j - 1] + rep_cost     # Substitution
+                )
 
     return int(D[m][n])
 
